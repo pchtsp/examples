@@ -14,6 +14,7 @@ LibraryModule Database_Interface_Generation {
     }
     Section Database_Information_Section {
         Comment: "This section contains the identifiers related to the analysis of the database structure.";
+        StringParameter spDatesSetName;
         StringParameter DataSource {
             InitialData: "DemoDatabaseLink.dsn";
             Comment: "The datasource from which to read the table and column information.";
@@ -48,7 +49,7 @@ LibraryModule Database_Interface_Generation {
         Set AIMMSIdentifierTypes {
             Index: par;
             Parameter: TheAIMMSParameterType;
-            Definition: data { 'String parameter', 'Element parameter', 'Parameter', 'Set' };
+            Definition: data { 'String parameter', 'Element parameter', 'Parameter', 'Set', 'Element date' };
             Comment: "The four possible AIMMS identifier types to correspond with a column in a database table.";
         }
         ElementParameter ColumnAIMMSParameterType {
@@ -149,7 +150,7 @@ LibraryModule Database_Interface_Generation {
                 ! No string type match found. Check the date/time types.
                 for (dat_dt) do
                 	if StringToUpper(ColumnDataType) = dat_dt then
-                		GetAIMMSIdentifierType := 'String parameter';
+                		GetAIMMSIdentifierType := 'Element date';
                 		return;
                 	endif;
                 endfor;
@@ -195,7 +196,7 @@ LibraryModule Database_Interface_Generation {
                 
                 	! Set focus to first table in 'Available tables'
                 	SelectedTable := first(TableNames);
-                	PageSetCursor("Database Interface Generation", "Available tables", SelectedTable);
+                	!PageSetCursor("Database Interface Generation", "Available tables", SelectedTable);
                 endif;
             }
             Comment: "This procedure retrieves all relevant table information from the specified data source.";
@@ -207,6 +208,16 @@ LibraryModule Database_Interface_Generation {
                 Default: 1;
                 Property: Optional;
             }
+        }
+        Procedure RetrieveTableInformation_scalar {
+            Body: {
+                RetrieveTableInformation(1);
+            }
+            Comment: "This procedure retrieves all relevant table information from the specified data source.";
+            StringParameter TableName {
+                Comment: "Temporary string parameter to store table names in.";
+            }
+            Parameter Continue;
         }
     }
     Section GUI_Section {
@@ -574,7 +585,19 @@ LibraryModule Database_Interface_Generation {
                 
                 for (col | ((not ColumnIsPrimaryKey(col)) and IncludeColumnInGeneration(col)) ) do
                 	! The column is a data column
-                	if ColumnAIMMSParameterType(col) = 'Parameter' then
+                	lspColName_plus_i:= formatstring("i_%e", col);
+                	lepIndex:= StringToElement(GeneratedIndices, lspColName_plus_i);
+                	!if the column name exists as a primary key somewhere in the model, ASSUME it should be a foreign key and make it an element parameter:
+                	if lepIndex then
+                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'element parameter', CreatedDeclarationsHandle);
+                		lepSetToMakeRange:=first(gs|SetRefersToIndex(gs, lepIndex));
+                		ElementRangeString:=formatstring("%e", lepSetToMakeRange);
+                		me::SetAttribute(CreatedParameterHandle, 'range', ElementRangeString);
+                	elseif ColumnAIMMSParameterType(col) = 'Element date' then
+                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'element parameter', CreatedDeclarationsHandle);
+                		ElementRangeString:= spDatesSetName;
+                		me::SetAttribute(CreatedParameterHandle, 'range', ElementRangeString);
+                	elseif ColumnAIMMSParameterType(col) = 'Parameter' then
                 		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'parameter', CreatedDeclarationsHandle);
                 	elseif ColumnAIMMSParameterType(col) = 'String parameter' then
                 		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'string parameter', CreatedDeclarationsHandle);
@@ -636,6 +659,15 @@ LibraryModule Database_Interface_Generation {
                 endblock
             }
             Comment: "This is the core procedure of the example. It creates the runtime library.";
+            DeclarationSection new {
+                StringParameter lspColName_plus_i;
+                ElementParameter lepSetToMakeRange {
+                    Range: GeneratedSets;
+                }
+                ElementParameter lepIndex {
+                    Range: GeneratedIndices;
+                }
+            }
             StringParameter IndexDomainString {
                 Comment: "Temporary string parameter for constructing the index domain attribute of the identifiers to be generated.";
             }
@@ -669,6 +701,39 @@ LibraryModule Database_Interface_Generation {
                 Range: TableNames;
                 Property: Input;
             }
+        }
+        Procedure GenerateIdentifiers_scalar {
+            Body: GenerateIdentifiers(TheTable);
+            Comment: "This is the core procedure of the example. It creates the runtime library.";
+            StringParameter IndexDomainString {
+                Comment: "Temporary string parameter for constructing the index domain attribute of the identifiers to be generated.";
+            }
+            StringParameter MappingString {
+                Comment: "Temporary string parameter for constructing the mapping attribute of the database table identifiers to be generated.";
+            }
+            StringParameter ElementRangeString {
+                Comment: "Temporary string parameter for constructing the range attribute of the element parameters to be generated.";
+            }
+            StringParameter SetName {
+                Comment: "Temporary string parameter to hold set names.";
+            }
+            StringParameter FullSetName {
+                Comment: "Temporary string parameter to hold set names, including the library prefix.";
+            }
+            StringParameter IndexName {
+                Comment: "Temporary string parameter to hold index names.";
+            }
+            StringParameter FullIndexName {
+                Comment: "Temporary string parameter to hold index names, including the library prefix.";
+            }
+            Parameter ExistingSetSelected {
+                Comment: "1 if the user selected an existing set in the procedure HandleDoubleIndices, 0 if not.";
+            }
+            Parameter DoubleIndexFound {
+                Range: binary;
+                Comment: "1 If a double index situation has been found, 0 if not.";
+            }
+            StringParameter MessageString;
         }
         Procedure SelectLibAndRemoveIdentifiers {
             Body: {
@@ -864,15 +929,72 @@ LibraryModule Database_Interface_Generation {
         Procedure procAutomatizeCreationTables {
             Body: {
                 !DataSource:=;
+                !RuntimeLibraryName:=
+                !RuntimeLibraryPrefix:=
+                spDatesSetName:="sCalendarDays";
                 GeneratedIndices:={};
+                GeneratedSets:={};
+                
                 if StringToElement(AllIdentifiers,RuntimeLibraryName) then
                 	me::Delete(StringToElement(AllIdentifiers,RuntimeLibraryName));
                 endif;
+                CreatedLibHandle := me::CreateLibrary(RuntimeLibraryName, RuntimeLibraryPrefix);
+                
+                !create a set of days and make all dates a subset of this set:
+                CreatedDeclarationsHandle := me::Create("DeclarationCalendar", 'declaration', CreatedLibHandle);
+                CreatedSetHandle := me::Create(spDatesSetName, 'set', CreatedDeclarationsHandle);
+                
                 RetrieveTableInformation(0);
                 for tab in TableNames do
                 	RetrieveColumnInformation(TheTableName :  tab);
                 	GenerateIdentifiers(TheTableName :  tab);
                 endfor;
+            }
+        }
+        Procedure GuessElementRangeFromModel {
+            Arguments: (ColumnName,ColumnDataType,SelectedRangeString);
+            Body: {
+                ! All sets and calendars of the model should be presented to the user to select from. The predefined set 'AllSets' contains a bit too much
+                ! data, so filter it before presenting its contents to the user. All sets/calendars from the 'Database Interface Generation' library are
+                ! filtered out.
+                empty SetsCalendarsForEltParRange;
+                for (indexSets) do
+                	SetName := FormatString("%e", indexSets);
+                	if SubString(SetName, 1, 5) <> "dig::" then
+                		SetElementAdd(SetsCalendarsForEltParRange, SelectedSetOrCalendar, SetName);
+                	endif;
+                endfor;
+                
+                SelectedSetOrCalendar := '';
+                if not DialogGetElement(FormatString("Select range for column '%s' (%s)", ColumnName, ColumnDataType), SelectedSetOrCalendar) then
+                	SelectedRangeString := "";
+                endif;
+                
+                SelectedRangeString := SelectedSetOrCalendar;
+            }
+            Comment: {
+                "If a date/time data column is found in the database, the default AIMMS identifier is set to \'element parameter\'. Before an element parameter
+                can be generated in the runtime library, the user should specify the set or calendar that should be used as the \'range\' attribute of the
+                element parameter."
+            }
+            StringParameter ColumnName {
+                Property: Input;
+                Comment: "The column name for which to retrieve the set/calendar to be used as the element range.";
+            }
+            StringParameter ColumnDataType {
+                Property: Input;
+                Comment: "The data type of the column for which to retrieve the set/calendar to be used as the element range.";
+            }
+            StringParameter SelectedRangeString {
+                Property: Output;
+                Comment: "The element range that is selected by the user, in string format. \"\" if no range is selected (i.e. the user clicked on \'Cancel\').";
+            }
+            ElementParameter SelectedSetOrCalendar {
+                Range: SetsCalendarsForEltParRange;
+                Comment: "The selected set or calendar.";
+            }
+            StringParameter SetName {
+                Comment: "A temporary string paremeter to contain the set/calendar name.";
             }
         }
     }

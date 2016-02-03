@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<Page Version="4000" TimeStamp="2014-05-21 12:47:22">
+<Page Version="4000" TimeStamp="2016-02-03 16:01:06">
 	<Location top="23" left="4" bottom="644" right="768" />
 	<PageEditSize Type="Inherited">
 		<Size Width="772" Height="622" />
@@ -9,7 +9,7 @@
 	<ResizeData>
 		<MainArea Line="FixedFromTop" Value="99">
 			<TopArea Line="FixedFromLeft" Value="200" />
-			<BottomArea Line="FixedFromLeft" Value="200">
+			<BottomArea Line="FixedFromLeft" Value="201">
 				<LeftArea Line="FixedFromTop" Value="204">
 					<BottomArea Line="FixedFromTop" Value="295" />
 				</LeftArea>
@@ -29,7 +29,7 @@
 	<PageObject Type="Scalar">
 		<Location top="216" left="210" bottom="246" right="324" />
 		<HelpTag>"Datasource"</HelpTag>
-		<TabOrder>7</TabOrder>
+		<TabOrder>6</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -44,7 +44,7 @@
 	<PageObject Type="Scalar">
 		<Location top="216" left="354" bottom="246" right="456" />
 		<HelpTag>"Owner"</HelpTag>
-		<TabOrder>9</TabOrder>
+		<TabOrder>8</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -59,7 +59,7 @@
 	<PageObject Type="Button">
 		<Location top="366" left="6" bottom="390" right="192" />
 		<HelpTag>"Retrieve Table Info"</HelpTag>
-		<TabOrder>13</TabOrder>
+		<TabOrder>12</TabOrder>
 		<LeaveOnEnter>false</LeaveOnEnter>
 		<ButtonType>Text</ButtonType>
 		<Title>"Retrieve Table Info"</Title>
@@ -68,7 +68,7 @@
 		<ActionSequence>
 			<Action Type="Run">
 				<RunWhat>SpecificProcecure</RunWhat>
-				<Procedure>dig::RetrieveTableInformation</Procedure>
+				<Procedure>dig::RetrieveTableInformation_scalar</Procedure>
 				<AbortOnError>true</AbortOnError>
 			</Action>
 		</ActionSequence>
@@ -76,7 +76,7 @@
 	<PageObject Type="Composite Table" Tag="Available tables">
 		<Location top="276" left="210" bottom="564" right="324" />
 		<HelpTag>"Available tables"</HelpTag>
-		<TabOrder>17</TabOrder>
+		<TabOrder>16</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -92,7 +92,7 @@
 	<PageObject Type="Pivot Table">
 		<Location top="276" left="330" bottom="564" right="762" />
 		<HelpTag>"Column Information"</HelpTag>
-		<TabOrder>18</TabOrder>
+		<TabOrder>17</TabOrder>
 		<ObjectUUID>ED57E685-B450-4E54-B6DE-37C89AD7F0F7</ObjectUUID>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
@@ -163,7 +163,7 @@
 	<PageObject Type="Scalar">
 		<Location top="216" left="456" bottom="246" right="558" />
 		<HelpTag>"Identifier prefix"</HelpTag>
-		<TabOrder>10</TabOrder>
+		<TabOrder>9</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -179,7 +179,7 @@
 		<Location top="396" left="6" bottom="420" right="192" />
 		<ReadOnly>VALUE := 1 - TableInfoRetrieved</ReadOnly>
 		<HelpTag>"Generate Identifiers"</HelpTag>
-		<TabOrder>14</TabOrder>
+		<TabOrder>13</TabOrder>
 		<LeaveOnEnter>false</LeaveOnEnter>
 		<ButtonType>Text</ButtonType>
 		<Title>"Generate Identifiers"</Title>
@@ -188,7 +188,7 @@
 		<ActionSequence>
 			<Action Type="Run">
 				<RunWhat>SpecificProcecure</RunWhat>
-				<Procedure>dig::GenerateIdentifiers</Procedure>
+				<Procedure>dig::GenerateIdentifiers_scalar</Procedure>
 				<AbortOnError>true</AbortOnError>
 			</Action>
 		</ActionSequence>
@@ -196,7 +196,7 @@
 	<PageObject Type="Button">
 		<Location top="216" left="324" bottom="246" right="348" />
 		<HelpTag>"Datasource"</HelpTag>
-		<TabOrder>8</TabOrder>
+		<TabOrder>7</TabOrder>
 		<LeaveOnEnter>false</LeaveOnEnter>
 		<ButtonType>Text</ButtonType>
 		<Title>"..."</Title>
@@ -255,7 +255,7 @@
 	<PageObject Type="Scalar">
 		<Location top="216" left="660" bottom="246" right="762" />
 		<HelpTag>"Library prefix"</HelpTag>
-		<TabOrder>12</TabOrder>
+		<TabOrder>11</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -337,7 +337,7 @@
 		<Location top="426" left="6" bottom="450" right="192" />
 		<ReadOnly>dig::HideLibraryButtons</ReadOnly>
 		<HelpTag>"Export Library"</HelpTag>
-		<TabOrder>15</TabOrder>
+		<TabOrder>14</TabOrder>
 		<LeaveOnEnter>false</LeaveOnEnter>
 		<ButtonType>Text</ButtonType>
 		<Title>"Export Library"</Title>
@@ -403,7 +403,7 @@
 	<PageObject Type="Scalar">
 		<Location top="216" left="558" bottom="246" right="660" />
 		<HelpTag>"Library name"</HelpTag>
-		<TabOrder>11</TabOrder>
+		<TabOrder>10</TabOrder>
 		<Font GUID="00000000-0000-0000-0000-000000000001" Name="Main Font" />
 		<Border Style="InShadow" Width="2" MarginTop="5" MarginRight="5" MarginBottom="5" MarginLeft="5" />
 		<BackgroundColor RGB="#ffffff" />
@@ -427,7 +427,7 @@
 		<Location top="456" left="6" bottom="480" right="192" />
 		<ReadOnly>dig::HideLibraryButtons</ReadOnly>
 		<HelpTag>"Remove Library"</HelpTag>
-		<TabOrder>16</TabOrder>
+		<TabOrder>15</TabOrder>
 		<LeaveOnEnter>false</LeaveOnEnter>
 		<ButtonType>Text</ButtonType>
 		<Title>"Remove Library"</Title>
@@ -445,7 +445,7 @@
 		<SelectionType>CheckBoxes</SelectionType>
 		<Location top="570" left="330" bottom="594" right="750" />
 		<HelpTag>"Generate read procedure"</HelpTag>
-		<TabOrder>19</TabOrder>
+		<TabOrder>18</TabOrder>
 		<Font GUID="3D4F8FDE-28E6-4338-998E-C89108819645" Name="Legend" />
 		<TextShown>IdentifierText</TextShown>
 		<Border Style="None" />
@@ -462,7 +462,7 @@
 		<SelectionType>CheckBoxes</SelectionType>
 		<Location top="588" left="330" bottom="612" right="750" />
 		<HelpTag>"Generate write procedure"</HelpTag>
-		<TabOrder>20</TabOrder>
+		<TabOrder>19</TabOrder>
 		<Font GUID="3D4F8FDE-28E6-4338-998E-C89108819645" Name="Legend" />
 		<TextShown>IdentifierText</TextShown>
 		<Border Style="None" />
@@ -482,7 +482,6 @@
 			<Symbol>dig::ColumnDataType</Symbol>
 			<Symbol>dig::ColumnAIMMSParameterType</Symbol>
 			<Symbol>dig::ColumnIsPrimaryKey</Symbol>
-			<Symbol>dig::RetrieveTableInformation</Symbol>
 			<Symbol>dig::HideLibraryButtons</Symbol>
 			<Symbol>dig::TableInfoRetrieved</Symbol>
 			<Symbol>dig::GenerateReadProc</Symbol>
@@ -498,12 +497,13 @@
 			<Symbol>dig::RuntimeLibraryPrefix</Symbol>
 			<Symbol>dig::RuntimeLibraryName</Symbol>
 			<Symbol>dig::IncludeColumnInGeneration</Symbol>
-			<Symbol>dig::GenerateIdentifiers</Symbol>
 			<Symbol>dig::SelectLibAndRemoveIdentifiers</Symbol>
 			<Symbol>dig::ExportSelectedLibrary</Symbol>
 			<Symbol>dig::tab</Symbol>
 			<Symbol>dig::TheTable</Symbol>
 			<Symbol>dig::col</Symbol>
+			<Symbol>dig::GenerateIdentifiers_scalar</Symbol>
+			<Symbol>dig::RetrieveTableInformation_scalar</Symbol>
 		</Model>
 	</UsedReferences>
 </Page>
