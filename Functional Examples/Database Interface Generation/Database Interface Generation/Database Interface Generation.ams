@@ -149,7 +149,7 @@ LibraryModule Database_Interface_Generation {
                 ! No string type match found. Check the date/time types.
                 for (dat_dt) do
                 	if StringToUpper(ColumnDataType) = dat_dt then
-                		GetAIMMSIdentifierType := 'Element parameter';
+                		GetAIMMSIdentifierType := 'String parameter';
                 		return;
                 	endif;
                 endfor;
@@ -169,9 +169,10 @@ LibraryModule Database_Interface_Generation {
             }
         }
         Procedure RetrieveTableInformation {
+            Arguments: (lpGui);
             Body: {
                 ! Emtpy existing table information
-                if card(TableNames) then
+                if card(TableNames) and lpGui then
                 	 Continue := DialogAsk("Existing table information will be deleted. Do you want to continue?", "Yes", "No");
                 else
                 	Continue := 1;
@@ -202,6 +203,10 @@ LibraryModule Database_Interface_Generation {
                 Comment: "Temporary string parameter to store table names in.";
             }
             Parameter Continue;
+            Parameter lpGui {
+                Default: 1;
+                Property: Optional;
+            }
         }
     }
     Section GUI_Section {
@@ -390,6 +395,10 @@ LibraryModule Database_Interface_Generation {
             Range: AllSymbols;
             Comment: "The database table handle, used by the Model Edit functions.";
         }
+        ElementParameter CreatedSectionsHandle {
+            Range: AllSymbols;
+            Comment: "The declaration section handle, used by the Model Edit functions.";
+        }
         ElementParameter CreatedDeclarationsHandle {
             Range: AllSymbols;
             Comment: "The declaration section handle, used by the Model Edit functions.";
@@ -471,6 +480,7 @@ LibraryModule Database_Interface_Generation {
             Comment: "The output file name for the exported library.";
         }
         Procedure GenerateIdentifiers {
+            Arguments: (TheTableName);
             Body: {
                 ! This is the actual ME API model text generation procedure.
                 block
@@ -510,14 +520,15 @@ LibraryModule Database_Interface_Generation {
                 GeneratedPrefix(TheLib) := RuntimeLibraryPrefix;
                 
                 ! Create a new declaration section for the current table
-                CreatedDeclarationsHandle := me::Create(FormatString("%e_Declarations", TheTable), 'declaration', CreatedLibHandle);
+                CreatedSectionsHandle:= me::Create(FormatString("%e",TheTableName), 'section', CreatedLibHandle);
+                CreatedDeclarationsHandle := me::Create(FormatString("%e_Declarations", TheTableName), 'declaration', CreatedSectionsHandle);
                 
                 for (col | (ColumnIsPrimaryKey(col) and IncludeColumnInGeneration(col))) do
                 	! Create sets for the primary key columns. In case the index has already been generated for this library before, this might indicate that
                 	! the user may want to use the same set as in the previous case. If not, the user should supply a new index name to prevent name clashes.
                 
-                	FullSetName := FormatString("%s::%s%e", RuntimeLibraryPrefix, IdentifierNamePrefix(TheTable), col);
-                	SetName := FormatString("%s%e", IdentifierNamePrefix(TheTable), col);
+                	FullSetName := FormatString("%s::%s%e", RuntimeLibraryPrefix, IdentifierNamePrefix(TheTableName), col);
+                	SetName := FormatString("%s%e", IdentifierNamePrefix(TheTableName), col);
                 	FullIndexName := FormatString("%s::i_%e", RuntimeLibraryPrefix, col);
                 	IndexName := FormatString("i_%e", col);
                 
@@ -564,11 +575,11 @@ LibraryModule Database_Interface_Generation {
                 for (col | ((not ColumnIsPrimaryKey(col)) and IncludeColumnInGeneration(col)) ) do
                 	! The column is a data column
                 	if ColumnAIMMSParameterType(col) = 'Parameter' then
-                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTable), col), 'parameter', CreatedDeclarationsHandle);
+                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'parameter', CreatedDeclarationsHandle);
                 	elseif ColumnAIMMSParameterType(col) = 'String parameter' then
-                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTable), col), 'string parameter', CreatedDeclarationsHandle);
+                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'string parameter', CreatedDeclarationsHandle);
                 	else
-                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTable), col), 'element parameter', CreatedDeclarationsHandle);
+                		CreatedParameterHandle := me::Create(FormatString("%s%e", IdentifierNamePrefix(TheTableName), col), 'element parameter', CreatedDeclarationsHandle);
                 
                 		! For element parameters, a range should be specified. Let the user choose this range, since AIMMS cannot guess this.
                 		GetElementRangeFromUser(FormatString("%e", col), ColumnDataType(col), ElementRangeString);
@@ -584,18 +595,18 @@ LibraryModule Database_Interface_Generation {
                 	! Set the index domain for the created parameter
                 	me::SetAttribute(CreatedParameterHandle, 'index domain', IndexDomainString);
                 
-                	MappingString += FormatString("\"%e\" --> %s%e%s,\n", col, IdentifierNamePrefix(TheTable), col, IndexDomainString);
+                	MappingString += FormatString("\"%e\" --> %s%e%s,\n", col, IdentifierNamePrefix(TheTableName), col, IndexDomainString);
                 endfor;
                 
                 ! Remove the last comma from the mapping string
                 MappingString := SubString(MappingString, 1, StringLength(MappingString) - 2);
                 
                 ! Create the database table
-                CreatedDBTableHandle := me::Create(FormatString("%eTable", TheTable), 'database table', CreatedDeclarationsHandle);
+                CreatedDBTableHandle := me::Create(FormatString("%eTable", TheTableName), 'database table', CreatedDeclarationsHandle);
                 
                 ! Create the datasource attribute
                 me::SetAttribute(CreatedDBTableHandle, 'data source', FormatString("\"%s\"", DataSource_WithDoubleBackSlashes));
-                me::SetAttribute(CreatedDBTableHandle, 'table name', FormatString("\"%e\"", TheTable));
+                me::SetAttribute(CreatedDBTableHandle, 'table name', FormatString("\"%e\"", TheTableName));
                 me::SetAttribute(CreatedDBTableHandle, 'owner', FormatString("\"%s\"", DSOwner));
                 
                 ! Create the mapping attrbute
@@ -603,14 +614,14 @@ LibraryModule Database_Interface_Generation {
                 
                 ! Create a procedure with a read statement
                 if GenerateReadProc then
-                	CreatedProcedureHandle := me::Create(FormatString("%sReadProc", IdentifierNamePrefix(TheTable)), 'procedure', CreatedLibHandle);
-                	me::SetAttribute(CreatedProcedureHandle, 'body', FormatString("Read from table %eTable;\n", TheTable));
+                	CreatedProcedureHandle := me::Create(FormatString("%sReadProc", IdentifierNamePrefix(TheTableName)), 'procedure', CreatedSectionsHandle);
+                	me::SetAttribute(CreatedProcedureHandle, 'body', FormatString("Read from table %eTable;\n", TheTableName));
                 endif;
                 
                 ! Create a procedure with a write statement
                 if GenerateWriteProc then
-                	CreatedProcedureHandle := me::Create(FormatString("%sWriteProc", IdentifierNamePrefix(TheTable)), 'procedure', CreatedLibHandle);
-                	me::SetAttribute(CreatedProcedureHandle, 'body', FormatString("Write to table %eTable;\n", TheTable));
+                	CreatedProcedureHandle := me::Create(FormatString("%sWriteProc", IdentifierNamePrefix(TheTableName)), 'procedure', CreatedSectionsHandle);
+                	me::SetAttribute(CreatedProcedureHandle, 'body', FormatString("Write to table %eTable;\n", TheTableName));
                 endif;
                 
                 
@@ -618,7 +629,7 @@ LibraryModule Database_Interface_Generation {
                 me::Compile(CreatedLibHandle);
                 
                 ! Store a link between TheTable and the library
-                TableIdentifiersGenerated(TheTable) := 1;
+                TableIdentifiersGenerated(TheTableName) := 1;
                 
                 onerror err do
                 	DialogMessage("Something went wrong. See the messages window for details.");
@@ -654,6 +665,10 @@ LibraryModule Database_Interface_Generation {
                 Comment: "1 If a double index situation has been found, 0 if not.";
             }
             StringParameter MessageString;
+            ElementParameter TheTableName {
+                Range: TableNames;
+                Property: Input;
+            }
         }
         Procedure SelectLibAndRemoveIdentifiers {
             Body: {
@@ -678,25 +693,28 @@ LibraryModule Database_Interface_Generation {
             Arguments: (TheCol,NewIndexName,ExistingSetSelected);
             Body: {
                 ! The index has already been used in this library. Display the problem for the user.
-                MessageString := FormatString("The PK column '%e' might refer to a set which has already been generated for a previous table. ", TheCol);
-                MessageString += "In the following dialog, the possibilities are shown. Either select one or click cancel to specify a unique index name later.";
-                DialogMessage(MessageString);
+                !MessageString := FormatString("The PK column '%e' might refer to a set which has already been generated for a previous table. ", TheCol);
+                !MessageString += "In the following dialog, the possibilities are shown. Either select one or click cancel to specify a unique index name later.";
+                !DialogMessage(MessageString);
                 
                 ! Show a dialog in which the user can select a previously generated set to map to. If he presses cancel, he will be asked to provide a new unique
                 ! index name.
                 TheIndex2 := StringToElement(GeneratedIndices, NewIndexName);
                 GeneratedSetsToSelectFrom := {gs | SetRefersToIndex(gs, TheIndex2)};
-                if DialogGetElement("Select a set to map to, or cancel", SelectedGeneratedSet) then
-                	ExistingSetSelected := 1;
-                	NewIndexName := IndexNameOfSet(SelectedGeneratedSet);
-                else
-                	! The user cancelled.
-                	ExistingSetSelected := 0;
-                
-                	! Ask the user for a new index name.
-                	while DialogGetString(FormatString("Please enter a unique index name to correspond with PK column '%e'", TheCol), NewIndexName) = 0 do
-                	endwhile;
-                endif;
+                SelectedGeneratedSet:= first(GeneratedSetsToSelectFrom);
+                ExistingSetSelected := 1;
+                !if DialogGetElement("Select a set to map to, or cancel", SelectedGeneratedSet) then
+                !	ExistingSetSelected := 1;
+                !	NewIndexName := IndexNameOfSet(SelectedGeneratedSet);
+                !else
+                !	! The user cancelled.
+                !	ExistingSetSelected := 0;
+                !
+                !	! Ask the user for a new index name.
+                !	while DialogGetString(FormatString("Please enter a unique index name to correspond with PK column '%e'", TheCol), NewIndexName) = 0 do
+                !	endwhile;
+                !endif;
+                !
             }
             ElementParameter TheCol {
                 Range: TableColumns;
@@ -839,6 +857,22 @@ LibraryModule Database_Interface_Generation {
             Comment: {
                 "This procedure is needed as a \'dummy\', to be able to generate the read procedures in the runtime library. See \'TheProc\' and \'GenerateIdentfiers\'
                 for more information."
+            }
+        }
+    }
+    Section baobab {
+        Procedure procAutomatizeCreationTables {
+            Body: {
+                !DataSource:=;
+                GeneratedIndices:={};
+                if StringToElement(AllIdentifiers,RuntimeLibraryName) then
+                	me::Delete(StringToElement(AllIdentifiers,RuntimeLibraryName));
+                endif;
+                RetrieveTableInformation(0);
+                for tab in TableNames do
+                	RetrieveColumnInformation(TheTableName :  tab);
+                	GenerateIdentifiers(TheTableName :  tab);
+                endfor;
             }
         }
     }
