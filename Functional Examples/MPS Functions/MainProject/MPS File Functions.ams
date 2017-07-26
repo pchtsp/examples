@@ -5,6 +5,44 @@ Model Main_MPS_File_Functions {
         "Keywords:
         MPS File, Tuning, MIP, Solving Options, Improving Solutions."
     }
+    Procedure procSolveMPS {
+        Arguments: (MPSFileName,time,gap,solvername);
+        Body: {
+            option time_limit:= time;
+            option MIP_relative_optimality_tolerance:= gap;
+            option GUROBI_7_0.Output_file:="Yes";
+            option GUROBI_7_0.Log_to_console:="Yes";
+            option solver_listing:="at_every_solve";
+            option solver_listing_messages:="all";
+            option solver_window_messages:="all";
+            SelectLPMIPSolver:= last(IndexSolvers| FindString(IndexSolvers,solvername));
+            if not SelectLPMIPSolver then return 0 endif;
+            ShowProgressWindow();
+            GMP::Tuning::SolveSingleMPS(MPSFileName, SelectLPMIPSolver, SolverStat, ProgramStat, ObjectiveValue, NumberIterations,SolverNodes,SolutionTime,1);
+            return 1;
+        }
+        StringParameter MPSFileName {
+            Property: Input;
+        }
+        StringParameter solvername {
+            Property: Input;
+        }
+        Parameter time {
+            Property: Input;
+        }
+        Parameter gap {
+            Property: Input;
+        }
+    }
+    Procedure Procedure_1 {
+        Body: {
+            procSolveMPS(
+            	MPSFileName :  "C:\\Users\\Franco\\Documents\\Projects\\baobab\\mopta2017\\python\\mopta2017_complete-pulp.lp", 
+            	time        :  300, 
+            	gap         :  0.1, 
+            	solvername  :  "GUROBI 7");
+        }
+    }
     Section MPS_Management {
         Section Execution_Section {
             Procedure SelectMPSForMulitpleTuning {
@@ -115,7 +153,7 @@ Model Main_MPS_File_Functions {
         }
         DeclarationSection Tuning_Declarations {
             Parameter TunerFlag {
-                Text: "The flag indicates the tuner to point to a right tuning directory ";
+                Text: "The flag indicates the tuner to point to a right tuning directory";
                 Range: nonnegative;
                 InitialData: 0;
             }
