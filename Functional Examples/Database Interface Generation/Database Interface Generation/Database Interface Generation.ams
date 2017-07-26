@@ -2,7 +2,7 @@
 
 LibraryModule Database_Interface_Generation {
     Prefix: dig;
-    Interface: data { ProcWithNoArgs };
+    Interface: data { GenerateIdentifiers, ProcWithNoArgs, UpdateSelectedTableName,DataSource,RetrieveTableInformation,TableNames };
     Comment: {
         "This library contains all functionality needed to facilitate the otherwise cumbersome process of creating an interface
         between AIMMS and a database table.
@@ -283,7 +283,7 @@ LibraryModule Database_Interface_Generation {
         Procedure BrowseForDataSources {
             Body: {
                 CurrentDataSource := DataSource;
-                FileSelect(DataSource, DataSourceDirectory, extension : ".dsn", title : "Select a datasource");
+                FileSelect(DataSource, DataSourceDirectory, extension : ".dsn; *.udl", title : "Select a datasource");
                 
                 if CurrentDataSource <> DataSource then
                 	DatasourceOrOwnerChanged;
@@ -291,7 +291,7 @@ LibraryModule Database_Interface_Generation {
             }
             Comment: {
                 "This procedure is called when the user has clicked on the \'...\' button. It makes the user select a file datasource
-                (.dsn file) from the file system.
+                (.dsn or .udl file) from the file system.
                 If a different datasource has been selected or the owner has changed, the table information needs to be retrieved again, so
                 DatasourceSOrOwnerChanged is called."
             }
@@ -926,75 +926,111 @@ LibraryModule Database_Interface_Generation {
         }
     }
     Section baobab {
-        Procedure procAutomatizeCreationTables {
-            Body: {
-                !DataSource:=;
-                !RuntimeLibraryName:=
-                !RuntimeLibraryPrefix:=
-                spDatesSetName:="sCalendarDays";
-                GeneratedIndices:={};
-                GeneratedSets:={};
-                
-                if StringToElement(AllIdentifiers,RuntimeLibraryName) then
-                	me::Delete(StringToElement(AllIdentifiers,RuntimeLibraryName));
-                endif;
-                CreatedLibHandle := me::CreateLibrary(RuntimeLibraryName, RuntimeLibraryPrefix);
-                
-                !create a set of days and make all dates a subset of this set:
-                CreatedDeclarationsHandle := me::Create("DeclarationCalendar", 'declaration', CreatedLibHandle);
-                CreatedSetHandle := me::Create(spDatesSetName, 'set', CreatedDeclarationsHandle);
-                
-                RetrieveTableInformation(0);
-                for tab in TableNames do
-                	RetrieveColumnInformation(TheTableName :  tab);
-                	GenerateIdentifiers(TheTableName :  tab);
-                endfor;
+        Section secAutomatizeLinkToTables {
+            Procedure procAutomatizeCreationTables {
+                Body: {
+                    !DataSource:=;
+                    !RuntimeLibraryName:=
+                    !RuntimeLibraryPrefix:=
+                    spDatesSetName:="sCalendarDays";
+                    GeneratedIndices:={};
+                    GeneratedSets:={};
+                    
+                    if StringToElement(AllIdentifiers,RuntimeLibraryName) then
+                    	me::Delete(StringToElement(AllIdentifiers,RuntimeLibraryName));
+                    endif;
+                    CreatedLibHandle := me::CreateLibrary(RuntimeLibraryName, RuntimeLibraryPrefix);
+                    
+                    !create a set of days and make all dates a subset of this set:
+                    CreatedDeclarationsHandle := me::Create("DeclarationCalendar", 'declaration', CreatedLibHandle);
+                    CreatedSetHandle := me::Create(spDatesSetName, 'set', CreatedDeclarationsHandle);
+                    
+                    RetrieveTableInformation(0);
+                    for tab in TableNames do
+                    	RetrieveColumnInformation(TheTableName :  tab);
+                    	GenerateIdentifiers(TheTableName :  tab);
+                    endfor;
+                }
             }
         }
-        Procedure GuessElementRangeFromModel {
-            Arguments: (ColumnName,ColumnDataType,SelectedRangeString);
-            Body: {
-                ! All sets and calendars of the model should be presented to the user to select from. The predefined set 'AllSets' contains a bit too much
-                ! data, so filter it before presenting its contents to the user. All sets/calendars from the 'Database Interface Generation' library are
-                ! filtered out.
-                empty SetsCalendarsForEltParRange;
-                for (indexSets) do
-                	SetName := FormatString("%e", indexSets);
-                	if SubString(SetName, 1, 5) <> "dig::" then
-                		SetElementAdd(SetsCalendarsForEltParRange, SelectedSetOrCalendar, SetName);
-                	endif;
-                endfor;
-                
-                SelectedSetOrCalendar := '';
-                if not DialogGetElement(FormatString("Select range for column '%s' (%s)", ColumnName, ColumnDataType), SelectedSetOrCalendar) then
-                	SelectedRangeString := "";
-                endif;
-                
-                SelectedRangeString := SelectedSetOrCalendar;
+        Section secRetrieveColumnInformation {
+            Procedure RetrieveColumnInformation_baobab {
+                Arguments: (TheTableName);
+                Body: {
+                    ! Start with a clean set of table columns
+                    !empty TableColumns;
+                    
+                    ! Determine all column data for the given table
+                    NumberOfColumns := SQLNumberOfColumns(DataSource, TheTableName, DSOwner);
+                    
+                    while LoopCount <= NumberOfColumns do
+                    	ColumnName := SQLColumnData(DataSource, TheTableName, LoopCount, DSOwner, 'Name');
+                    	SetElementAdd(TableColumns, TheTableColumn, ColumnName);
+                    	ColumnDataType(TheTableColumn) := SQLColumnData(DataSource, TheTableName, LoopCount, DSOwner, 'DataType');
+                    	ColumnIsPrimaryKey(TheTableColumn) := (SQLColumnData(DataSource, TheTableName, LoopCount, DSOwner, 'IsPrimaryKey') = "Yes");
+                    	lp01ColumnActive(TheTableColumn):=1;
+                    endwhile;
+                    
+                    ! All relevant data has been retrieved from the datasource. Now, for all non-primary key columns (i.e. the data columns), determine whether the
+                    ! corresponding AIMMS identifiers to be generated should be parameters, string parameters or element parameters.
+                    for (col | not ColumnIsPrimaryKey(col) and lp01ColumnActive(col)) do
+                    	ColumnAIMMSParameterType(col) := GetAIMMSIdentifierType(ColumnDataType(col));
+                    endfor;
+                    
+                    ! All primary key columns are always generated as a set.
+                    ColumnAIMMSParameterType(col | ColumnIsPrimaryKey(col) and lp01ColumnActive(col)) := 'Set';
+                    
+                    ! Set the initial value of the "Include" column in the Pivot Table to "Yes"
+                    IncludeColumnInGeneration(col) := 1;
+                    
+                    ! Propose an initial identifier name prefix
+                    if IdentifierNamePrefix(TheTableName) = "" then
+                    	IdentifierNamePrefix(TheTableName) := FormatString("%e_", TheTableName);
+                    endif;
+                }
+                Comment: "This procedure retrieves the complete column information for the given table name.";
+                StringParameter ColumnName {
+                    Comment: "Temporary string to store the current column name.";
+                }
+                Parameter lp01ColumnActive {
+                    IndexDomain: (col);
+                }
+                ElementParameter TheTableName {
+                    Range: TableNames;
+                    Property: Input;
+                    Comment: "This argument contains the table name that is selected in the composite table.";
+                }
             }
-            Comment: {
-                "If a date/time data column is found in the database, the default AIMMS identifier is set to \'element parameter\'. Before an element parameter
-                can be generated in the runtime library, the user should specify the set or calendar that should be used as the \'range\' attribute of the
-                element parameter."
+            Procedure FillIdentifiers {
+                Body: {
+                    empty TableColumns;
+                    for tab do
+                    	! Retrieve the column infomation for the selected table
+                    	empty ColumnDataType, ColumnAIMMSParameterType, ColumnIsPrimaryKey;
+                    	RetrieveColumnInformation_baobab(tab);
+                    	TableColumnDataType(tab, col):=ColumnDataType(col);
+                    	TableColumnAIMMSParameterType(tab, col):=ColumnAIMMSParameterType(col);
+                    	TableColumnIsPrimaryKey(tab, col):=ColumnIsPrimaryKey(col);
+                    endfor;
+                }
+                Comment: {
+                    "This procedure is called when the user selects a table name from the composite table. It makes sure that the column information in
+                    the Pivot Table is updated."
+                }
             }
-            StringParameter ColumnName {
-                Property: Input;
-                Comment: "The column name for which to retrieve the set/calendar to be used as the element range.";
+            StringParameter TableColumnDataType {
+                IndexDomain: (tab,col);
+                Comment: "The data type of the column in the database.";
             }
-            StringParameter ColumnDataType {
-                Property: Input;
-                Comment: "The data type of the column for which to retrieve the set/calendar to be used as the element range.";
+            ElementParameter TableColumnAIMMSParameterType {
+                IndexDomain: (tab,col);
+                Range: AIMMSIdentifierTypes;
+                Comment: "The AIMMS identifier parameter type of the column \'col\'.";
             }
-            StringParameter SelectedRangeString {
-                Property: Output;
-                Comment: "The element range that is selected by the user, in string format. \"\" if no range is selected (i.e. the user clicked on \'Cancel\').";
-            }
-            ElementParameter SelectedSetOrCalendar {
-                Range: SetsCalendarsForEltParRange;
-                Comment: "The selected set or calendar.";
-            }
-            StringParameter SetName {
-                Comment: "A temporary string paremeter to contain the set/calendar name.";
+            Parameter TableColumnIsPrimaryKey {
+                IndexDomain: (tab,col);
+                Range: binary;
+                Comment: "1 If column \'col\' is a primary key column in the database table, 0 if not.";
             }
         }
     }

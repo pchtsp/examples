@@ -5,4 +5,8 @@
 			<Page Name="Database Interface Generation" PageGUID="0137F17E-A537-4530-96AA-E66653592128" />
 		</Template>
 	</Template>
+	<Page Name="All Data Pages" PageGUID="3157868C-D17B-40A8-8748-205B2EEB74BB" />
+	<Page Name="[Data Page] dig TableColumnDataType" PageGUID="3A13819F-B011-4B3E-A2F4-F29EF267FBB9" />
+	<Page Name="DatabaseTablesColumnsInfo" PageGUID="48313C39-A88E-4051-B466-D1E4EE2D54DB" />
+	<Page Name="[Data Page] dig TableColumnAIMMSParameterType" PageGUID="4400E9F2-BF5D-4B50-B755-277217CCBBA2" />
 </TemplateManager>
